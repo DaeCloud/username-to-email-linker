@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Express App</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+
+<body>
+    <h1>Welcome to the BBD Minecraft Server Registration</h1>
+    <p>In order to access the BBD Minecraft Server, you need to verify that you are an employee of BBD.</p>
+    <p>The easiest way to do this is to send a verification code to your BBD email address.</p>
+    <p>Please ensure that your minecraft username is correct and enter your BBD email address. We will send you a
+        verification code that you can then enter to whitelist your Minecraft account on the server.</p>
+    <p>Note: We will never use you email address for anything other than sending the verification code.</p>
+
+    <form id="register">
+        <input type="text" id="minecraft_username" name="minecraft_username" placeholder="Minecraft Username" /><br />
+        <input type="email" id="email" name="email" placeholder="Email Address" /><br />
+
+        <button id="send_verification_code">Send Verification Code</button>
+    </form>
+
+    <div id="verify_section">
+        <input type="text" id="verify_input" name="verify_input" placeholder="Enter Code" />
+        <br />
+        <button id="verity_btn">Verify</button>
+    </div>
+
+    <p id="message_area"></p>
+
+    <script src="js/script.js"></script>
+</body>
+
+</html>
