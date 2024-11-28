@@ -7,8 +7,10 @@ const crypto = require("crypto");
 const app = express();
 const port = 3000;
 
+require('dotenv').config()
+
 // Allowed email domain
-const allowedDomain = "@me.com";
+const allowedDomain = process.env.ALLOWED_DOMAIN;
 
 // Middleware
 app.use(bodyParser.urlencoded({ extended: true }));
@@ -42,12 +44,12 @@ db.serialize(() => {
 
 // Configure Nodemailer
 const transporter = nodemailer.createTransport({
-  host: "mail.liquidcraft.co.za", // Replace with your SMTP server
-  port: 465, // Usually 587 for TLS, or 465 for SSL
+  host: process.env.SMTP_SERVER, // Replace with your SMTP server
+  port: process.env.SMTP_PORT, // Usually 587 for TLS, or 465 for SSL
   secure: true, // Set to true if using port 465 (SSL)
   auth: {
-    user: "no-reply@liquidcraft.co.za", // Replace with your email address
-    pass: "Idon'tknowwhatthepasswordis", // Replace with your email password or app-specific password
+    user: process.env.SMTP_USERNAME, // Replace with your email address
+    pass: process.env.SMTP_PASSWORD, // Replace with your email password or app-specific password
   },
 });
 
@@ -85,17 +87,20 @@ app.post("/register", (req, res) => {
       // Send email with verification code
       transporter.sendMail(
         {
-          from: "no-reply@liquidcraft.co.za", // Replace with your email
+          from: process.env.EMAIL_ADDRESS, // Replace with your email
           to: email,
-          subject: "BBD Minecraft Server | Verification Code",
-          text: `Thank you for registering on the BBD Minecraft Server. Please enter your verification code on the website to complete your registration\n\nYour verification code is: ${verificationCode}`,
+          subject: process.env.EMAIL_SUBJECT,
+          text: process.env.EMAIL_MESSAGE.replace("{verificationCode}", verificationCode),
         },
         (err) => {
           if (err) {
             console.error(err);
-            return res
+            // remove entry form db
+            db.run(`REMOVE FROM users WHERE minecraft_username = ? AND email = ?`, [username, email], function(err){
+              return res
               .status(500)
               .json({ success: false, message: "Error sending email." });
+            });
           }
 
           res.json({
