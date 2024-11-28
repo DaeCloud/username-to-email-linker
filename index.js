@@ -106,7 +106,7 @@ app.post("/register", (req, res) => {
           res.json({
             success: true,
             message:
-              "Registration successful. Check your email for the verification code.",
+              "Email sent. Check your inbox for the verification code.",
           });
         }
       );
@@ -164,6 +164,32 @@ app.post("/verify", (req, res) => {
       );
     }
   );
+});
+
+app.get("/isVerified/:username", (req, res) => {
+  // Access the username parameter
+  const username = req.params.username;
+
+  db.get("SELECT is_verified FROM users WHERE minecraft_username = ?", [username], function(err, row){
+    if(err){
+      console.error(err);
+      return res
+        .status(500)
+        .json({ success: false, is_verified: false });
+    }
+
+    if (!row) {
+      return res.json({
+        success: true,
+        is_verified: false,
+      });
+    }
+
+    return res.json({
+      success: true,
+      is_verified: row.is_verified == 1 ? true : false,
+    });
+  });
 });
 
 // Start the server

@@ -39,13 +39,20 @@ send_verification_code_btn.addEventListener("click", (event) => {
   fetch("/register", requestOptions)
     .then((response) => response.json())
     .then((result) => {
-      message_area.textContent = result.message;
+      let alert = document.createElement("div");
+      alert.classList.add("alert");
+      alert.setAttribute("role", "alert");
+      alert.textContent = result.message;
+
       if (result.success) {
-        message_area.style.backgroundColor = "green";
+        alert.classList.add("alert-primary");
         verify_section.style.display = "block";
       } else {
-        message_area.style.backgroundColor = "red";
+        alert.classList.add("alert-danger");
       }
+
+      document.getElementById("send-message").innerHTML = "";
+      document.getElementById("send-message").appendChild(alert);
     })
     .catch((error) => {});
 });
@@ -74,13 +81,20 @@ verity_btn.addEventListener("click", (event) => {
   fetch("/verify", requestOptions)
     .then((response) => response.json())
     .then((result) => {
-      message_area.textContent = result.message;
+      let alert = document.createElement("div");
+      alert.classList.add("alert");
+      alert.setAttribute("role", "alert");
+      alert.textContent = result.message;
+
       if (result.success) {
-        message_area.style.backgroundColor = "green";
+        alert.classList.add("alert-success");
         verify_section.style.display = "block";
       } else {
-        message_area.style.backgroundColor = "red";
+        alert.classList.add("alert-danger");
       }
+
+      document.getElementById("verify-message").innerHTML = "";
+      document.getElementById("verify-message").appendChild(alert);
     })
     .catch((error) => {});
 });
