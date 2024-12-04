@@ -12,24 +12,15 @@
 <body class="container">
     <h1 class="text-center">Welcome to the BBD Minecraft Server Registration</h1>
     <p class="text-center">In order to access the BBD Minecraft Server, you need to verify that you are an employee of BBD.</p>
-    <p class="text-center">The easiest way to do this is to send a verification code to your BBD email address.</p>
-    <p class="text-center">Please ensure that your minecraft username is correct and enter your BBD email address. We will send you a
-        verification code that you can then enter to whitelist your Minecraft account on the server.</p>
-    <p class="text-center">Note: We will never use you email address for anything other than sending the verification code.</p>
+    <p class="text-center">The easiest way to do this is to check that you are part of the BBD Gaming Discord server.</p>
+    <p class="text-center">Please ensure that your minecraft username is correct and click the button to verify with Discord.</p>
+    <p class="text-center">This verification process uses Discord's OAuth2 flow. You will sign in with your discord account so That we can verify that you are part of the discord server. the scope used for this sign in is only <b>identify</b> and <b>guilds</b>, we will not access or store any other information.</b></p>
 
     <form id="register">
         <input type="text" id="minecraft_username" name="minecraft_username" placeholder="Minecraft Username" class="form-control mb-3" />
-        <input type="email" id="email" name="email" placeholder="Email Address" class="form-control mb-3" />
 
-        <button id="send_verification_code"class="btn btn-primary mb-3">Send Verification Code</button>
+        <button id="discord-login-button" class="btn btn-primary mb-3">Sign in with Discord</button>
     </form>
-
-    <div id="send-message"></div>
-
-    <div id="verify_section" class="mt-3 mb-3">
-        <input type="text" id="verify_input" name="verify_input" placeholder="Enter Code" class="form-control mb-3" />
-        <button id="verity_btn" class="btn btn-success">Verify</button>
-    </div>
 
     <div id="verify-message"></div>
 

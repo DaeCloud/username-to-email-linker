@@ -1,16 +1,18 @@
 const express = require("express");
 const bodyParser = require("body-parser");
-const nodemailer = require("nodemailer");
 const sqlite3 = require("sqlite3").verbose();
-const crypto = require("crypto");
+const axios = require('axios');
+const querystring = require('querystring');
 
 const app = express();
 const port = 3000;
 
-require('dotenv').config()
+require('dotenv').config();
 
-// Allowed email domain
-const allowedDomain = process.env.ALLOWED_DOMAIN;
+const DISCORD_CLIENT_ID = process.env.DISCORD_CLIENT_ID;
+const DISCORD_CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET;
+const DISCORD_REDIRECT_URI = process.env.DISCORD_REDIRECT_URI;
+const DISCORD_API_BASE_URL = process.env.DISCORD_API_BASE_URL;
 
 // Middleware
 app.use(bodyParser.urlencoded({ extended: true }));
@@ -35,143 +37,124 @@ db.serialize(() => {
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             minecraft_username TEXT NOT NULL,
-            email TEXT NOT NULL,
-            verification_code TEXT,
+            discord_username TEXT NOT NULL,
             is_verified INTEGER DEFAULT 0
         )
     `);
 });
 
-// Configure Nodemailer
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_SERVER, // Replace with your SMTP server
-  port: process.env.SMTP_PORT, // Usually 587 for TLS, or 465 for SSL
-  secure: true, // Set to true if using port 465 (SSL)
-  auth: {
-    user: process.env.SMTP_USERNAME, // Replace with your email address
-    pass: process.env.SMTP_PASSWORD, // Replace with your email password or app-specific password
-  },
+// Step 1: Redirect to Discord's OAuth2 authorization page
+app.get('/discord/login', (req, res) => {
+  const minecraftUsername = req.query.username; // Capture the username from query
+  if (!minecraftUsername) {
+    return res.status(400).send("Minecraft username is required.");
+  }
+
+  // Add the username to the redirect URL to carry it through the OAuth2 process
+  const redirectUri = `https://discord.com/oauth2/authorize?client_id=${DISCORD_CLIENT_ID}&redirect_uri=${encodeURIComponent(DISCORD_REDIRECT_URI)}&response_type=code&scope=identify%20guilds&state=${encodeURIComponent(minecraftUsername)}`;
+
+  res.redirect(redirectUri);
 });
 
-// Registration endpoint
-app.post("/register", (req, res) => {
-  const { username, email } = req.body;
 
-  if (!username || !email) {
-    return res.status(400).json({
-      success: false,
-      message: "Minecraft username and email are required.",
-    });
+app.get('/discord/callback', async (req, res) => {
+  const { code, state } = req.query;
+
+  if (!code) {
+    return res.status(400).send('Authorization code not provided');
   }
 
-  if (!email.endsWith(allowedDomain)) {
-    return res.status(400).json({
-      success: false,
-      message: "Email must belong to the company domain.",
-    });
+  // The Minecraft username is in the 'state' parameter
+  const minecraftUsername = state;
+  if (!minecraftUsername) {
+    return res.status(400).send('Minecraft username not provided');
   }
 
-  const verificationCode = crypto.randomInt(100000, 999999).toString();
-
-  db.run(
-    `INSERT INTO users (minecraft_username, email, verification_code) VALUES (?, ?, ?)`,
-    [username, email, verificationCode],
-    function (err) {
-      if (err) {
-        console.error(err);
-        return res
-          .status(500)
-          .json({ success: false, message: "Error saving user data." });
-      }
-
-      // Send email with verification code
-      transporter.sendMail(
-        {
-          from: process.env.EMAIL_ADDRESS, // Replace with your email
-          to: email,
-          subject: process.env.EMAIL_SUBJECT,
-          text: process.env.EMAIL_MESSAGE.replace("{verificationCode}", verificationCode),
+  try {
+    // Exchange the authorization code for an access token
+    const response = await axios.post(
+      `https://discord.com/api/v10/oauth2/token`,
+      querystring.stringify({
+        client_id: DISCORD_CLIENT_ID,
+        client_secret: DISCORD_CLIENT_SECRET,
+        code,
+        grant_type: 'authorization_code',
+        redirect_uri: DISCORD_REDIRECT_URI,
+        scope: 'identify guilds',
+      }),
+      {
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
         },
-        (err) => {
-          if (err) {
-            console.error(err);
-            // remove entry form db
-            db.run(`REMOVE FROM users WHERE minecraft_username = ? AND email = ?`, [username, email], function(err){
-              return res
-              .status(500)
-              .json({ success: false, message: "Error sending email." });
-            });
-          }
+      }
+    );
 
-          res.json({
-            success: true,
-            message:
-              "Email sent. Check your inbox for the verification code.",
-          });
-        }
-      );
-    }
-  );
-});
+    const { access_token } = response.data;
 
-// Verification endpoint
-app.post("/verify", (req, res) => {
-  const { username, verificationCode } = req.body;
-
-  if (!username || !verificationCode) {
-    return res.status(400).json({
-      success: false,
-      message: "Username and verification code are required.",
+    const userResponse = await axios.get(`${DISCORD_API_BASE_URL}/users/@me`, {
+      headers: {
+        Authorization: `Bearer ${access_token}`,
+      },
     });
-  }
 
-  db.get(
-    `SELECT * FROM users WHERE minecraft_username = ? AND verification_code = ?`,
-    [username, verificationCode],
-    (err, row) => {
-      if (err) {
-        console.error(err);
-        return res
-          .status(500)
-          .json({ success: false, message: "Error verifying user." });
+    const discordUsername = userResponse.data.username;
+
+    db.get("SELECT * FROM users WHERE discord_username = ?", [discordUsername], async function (err, row) {
+      if (row) {
+        return res.redirect('/?success=false&message=You%20have%20already%20linked%20an%20account.');
       }
 
-      if (!row) {
-        return res.status(400).json({
-          success: false,
-          message: "Invalid username or verification code.",
-        });
-      }
-
-      db.run(
-        `UPDATE users SET is_verified = 1 WHERE id = ?`,
-        [row.id],
-        (err) => {
-          if (err) {
-            console.error(err);
-            return res.status(500).json({
-              success: false,
-              message: "Error updating verification status.",
-            });
-          }
-
-          res.json({
-            success: true,
-            message:
-              "Verification successful! Your email has been verified and your account has been whitelisted on the server.",
-          });
+      // Step 3: Use the access token to retrieve the user's guilds
+      const guildsResponse = await axios.get(
+        `${DISCORD_API_BASE_URL}/users/@me/guilds`,
+        {
+          headers: {
+            Authorization: `Bearer ${access_token}`,
+          },
         }
       );
-    }
-  );
+
+      const userGuilds = guildsResponse.data;
+
+      // Check if the user is in the specific guild (replace with your guild ID)
+      const targetGuildId = process.env.TARGET_GUILD_ID; // replace with the actual server ID
+      const isUserInGuild = userGuilds.some(guild => guild.id === targetGuildId);
+
+      if (isUserInGuild) {
+        // Insert the Minecraft username into the database
+        db.run(
+          `INSERT INTO users (minecraft_username, discord_username, is_verified) VALUES (?, ?, ?)`,
+          [minecraftUsername, discordUsername, 1],
+          function (err) {
+            if (err) {
+              console.error(err);
+              return res
+                .status(500)
+                .json({ success: false, message: "Error saving user data." });
+            }
+
+            // Redirect to home page with success=true
+            res.redirect('/?success=true');
+          }
+        );
+      } else {
+        return res.redirect('/?success=false&message=You%20could%20not%20be%20verified.%20Please%20ensure%20that%20you%20are%20part%20of%20the%20correct%20Discord%20server.');
+      }
+    });
+
+
+  } catch (error) {
+    console.error('Error during OAuth2 flow:', error);
+    res.status(500).send('Internal Server Error');
+  }
 });
 
 app.get("/isVerified/:username", (req, res) => {
   // Access the username parameter
   const username = req.params.username;
 
-  db.get("SELECT is_verified FROM users WHERE minecraft_username = ?", [username], function(err, row){
-    if(err){
+  db.get("SELECT is_verified FROM users WHERE minecraft_username = ?", [username], function (err, row) {
+    if (err) {
       console.error(err);
       return res
         .status(500)
